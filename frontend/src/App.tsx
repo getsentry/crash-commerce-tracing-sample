@@ -27,7 +27,6 @@ type Product = {
   priceMinor: number
   badge?: string
   color?: string
-  icon?: React.ReactNode
 }
 
 type CartLine = {
@@ -41,50 +40,14 @@ type ProviderConfig = { minMs: number; maxMs: number; failureRate: number }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174'
 
-const PRODUCTS: Product[] = [
-  {
-    id: 'npe',
-    name: 'NullPointerException',
-    description: 'Classic dereference gone wrong. Perfect for legacy Java stacks.',
-    priceMinor: 1299,
-    badge: 'Bestseller',
-    color: 'from-purple-600 to-pink-600',
-    icon: <Zap className="w-5 h-5" />
-  },
-  {
-    id: 'typeerror',
-    name: 'TypeError: undefined is not a function',
-    description: 'Bring back 2014 vibes in your JS app.',
-    priceMinor: 999,
-    color: 'from-blue-600 to-cyan-600',
-    icon: <Sparkles className="w-5 h-5" />
-  },
-  {
-    id: 'segfault',
-    name: 'Segmentation Fault',
-    description: 'A low-level thrill for your C/C++ adventures.',
-    priceMinor: 1999,
-    badge: 'Premium',
-    color: 'from-red-600 to-orange-600',
-    icon: <Shield className="w-5 h-5" />
-  },
-  {
-    id: 'syntax',
-    name: 'SyntaxError: Unexpected token',
-    description: 'Small typo, big adventure. Great for onboarding.',
-    priceMinor: 599,
-    color: 'from-green-600 to-emerald-600',
-    icon: <Star className="w-5 h-5" />
-  },
-  {
-    id: 'oom',
-    name: 'OutOfMemoryError',
-    description: 'Stress-test your autoscaling like a pro.',
-    priceMinor: 2499,
-    color: 'from-indigo-600 to-purple-600',
-    icon: <Package className="w-5 h-5" />
-  },
-]
+// Product icon mapping
+const PRODUCT_ICONS: Record<string, React.ReactNode> = {
+  'npe': <Zap className="w-32 h-32 drop-shadow-2xl" />,
+  'typeerror': <Sparkles className="w-32 h-32 drop-shadow-2xl" />,
+  'segfault': <Shield className="w-32 h-32 drop-shadow-2xl" />,
+  'syntax': <Star className="w-32 h-32 drop-shadow-2xl" />,
+  'oom': <Package className="w-32 h-32 drop-shadow-2xl" />,
+}
 
 function formatMoney(minor: number) {
   return `$${(minor / 100).toFixed(2)}`
@@ -161,7 +124,7 @@ function HeroSection() {
 }
 
 // Product Card Component
-function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: () => void }) {
+function ProductCard({ product, onAddToCart }: { product: Product & { icon?: React.ReactNode }; onAddToCart: () => void }) {
   const [ref, inView] = useInView({
     threshold: 0.1,
     triggerOnce: true
@@ -187,8 +150,8 @@ function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: 
             whileHover={{ scale: 1.1, rotate: 5 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="text-white/20 text-6xl font-bold">
-              {product.icon || <Package className="w-24 h-24" />}
+            <div className="text-white/40">
+              {product.icon || <Package className="w-32 h-32 drop-shadow-2xl" />}
             </div>
           </motion.div>
           {product.badge && (
@@ -246,7 +209,8 @@ function CartDrawer({
   isCheckingOut,
   paymentProvider,
   onChangeProvider,
-  providerConfig
+  providerConfig,
+  products
 }: {
   isOpen: boolean
   onClose: () => void
@@ -258,13 +222,14 @@ function CartDrawer({
   paymentProvider: PaymentProvider
   onChangeProvider: (provider: PaymentProvider) => void
   providerConfig?: Record<PaymentProvider, ProviderConfig> | null
+  products: Product[]
 }) {
   const cartValueMinor = useMemo(() => {
     return cart.reduce((sum, line) => {
-      const product = PRODUCTS.find((p) => p.id === line.productId)!
-      return sum + product.priceMinor * line.quantity
+      const product = products.find((p) => p.id === line.productId)
+      return sum + (product ? product.priceMinor * line.quantity : 0)
     }, 0)
-  }, [cart])
+  }, [cart, products])
 
   return (
     <AnimatePresence>
@@ -315,7 +280,8 @@ function CartDrawer({
                 <div className="space-y-4">
                   <AnimatePresence mode="popLayout">
                     {cart.map((line) => {
-                      const product = PRODUCTS.find((p) => p.id === line.productId)!
+                      const product = products.find((p) => p.id === line.productId)
+                      if (!product) return null
                       return (
                         <motion.div
                           key={line.productId}
@@ -327,7 +293,7 @@ function CartDrawer({
                         >
                           <div className="flex items-start gap-4">
                             <div className={`w-16 h-16 rounded-lg bg-gradient-to-br ${product.color || 'from-purple-600 to-pink-600'} flex items-center justify-center`}>
-                              {product.icon || <Package className="w-8 h-8 text-white/50" />}
+                              {PRODUCT_ICONS[product.id] || <Package className="w-8 h-8 text-white/50" />}
                             </div>
                             
                             <div className="flex-1">
@@ -470,6 +436,7 @@ function App() {
   const [providerConfig, setProviderConfig] = useState<Record<PaymentProvider, ProviderConfig> | null>(null)
   const [orderConfirmation, setOrderConfirmation] = useState<{ orderId: string; provider: string; total: number } | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
 
   const cartCount = useMemo(
     () => cart.reduce((sum, line) => sum + line.quantity, 0),
@@ -485,6 +452,16 @@ function App() {
   }, [])
 
   useEffect(() => {
+    // Fetch products from backend
+    fetch(`${API_URL}/api/products`)
+      .then((r) => r.json())
+      .then((data) => setProducts(data))
+      .catch((err) => {
+        console.error('Failed to fetch products:', err)
+        setProducts([])
+      })
+
+    // Fetch payment config
     fetch(`${API_URL}/api/payment-config`)
       .then((r) => r.json())
       .then((cfg) => setProviderConfig(cfg))
@@ -503,7 +480,7 @@ function App() {
     })
     
     // Show toast notification
-    const product = PRODUCTS.find(p => p.id === productId)
+    const product = products.find(p => p.id === productId)
     if (product) {
       setAddedToCart(`✨ Added ${product.name} to cart`)
       setTimeout(() => setAddedToCart(null), 3000)
@@ -531,8 +508,8 @@ function App() {
     setCheckoutError(null)
 
     const cartValueMinor = cart.reduce((sum, line) => {
-      const product = PRODUCTS.find((p) => p.id === line.productId)!
-      return sum + product.priceMinor * line.quantity
+      const product = products.find((p) => p.id === line.productId)
+      return sum + (product ? product.priceMinor * line.quantity : 0)
     }, 0)
 
     await Sentry.startSpan(
@@ -751,10 +728,10 @@ function App() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {PRODUCTS.map((product) => (
+          {products.map((product) => (
             <ProductCard
               key={product.id}
-              product={product}
+              product={{ ...product, icon: PRODUCT_ICONS[product.id] }}
               onAddToCart={() => addToCart(product.id)}
             />
           ))}
@@ -798,6 +775,7 @@ function App() {
         paymentProvider={paymentProvider}
         onChangeProvider={setPaymentProvider}
         providerConfig={providerConfig}
+        products={products}
       />
 
       {/* Footer */}

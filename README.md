@@ -7,7 +7,8 @@ A end-to-end sample showing Sentry tracing and span metrics across a checkout fl
 - Sentry: JavaScript SDK for React and Node with single-span patterns
 
 ## Features
-- Product list page with animated cards and "Add to Cart"
+- Product list fetched from backend API (`GET /api/products`)
+- Product cards with animated UI and "Add to Cart" functionality
 - Cart page with item count, total price, and Checkout button
 - Checkout calls `POST /api/checkout` with simulated latency and 10–20% failures
 - Order confirmation modal shows order ID, provider, and total on success
@@ -103,7 +104,7 @@ npm run dev:frontend
 # -> http://localhost:5173
 ```
 
-The frontend connects directly to the backend API.
+The frontend connects directly to the backend API (no proxy required).
 
 ### Build for production
 ```bash
@@ -120,8 +121,13 @@ npm run build:backend
 - Frontend Sentry init: `frontend/src/sentry.ts`
  - Backend spans: `backend/src/server.ts` in the `/api/checkout` handler using `startSpan` (distributed tracing is propagated automatically), plus a child span for payment
 
-### Provider performance configuration endpoint
-- `GET /api/payment-config` returns the effective per-provider configuration derived from environment variables. The UI fetches this on load and displays each provider’s latency range and failure rate next to the selector in the cart.
+### API Endpoints
+- `GET /api/products` - Returns the product catalog with names, descriptions, prices, and styling
+- `GET /api/payment-config` - Returns the effective per-provider configuration derived from environment variables
+- `POST /api/checkout` - Processes orders with simulated payment processing
+- `GET /api/health` - Health check endpoint
+
+The UI fetches products and payment config on load, displaying provider performance metrics in the cart.
 
 ## Testing plan
 - Perform 10–20 successful checkouts and 3–5 failed ones

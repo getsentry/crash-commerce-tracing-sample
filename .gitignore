@@ -1,0 +1,49 @@
+# Node
+node_modules/
+**/node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Vite cache
+.vite/
+**/.vite/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Caches
+.eslintcache
+.cache/
+
+# Editors/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+

@@ -1,14 +1,12 @@
+import './instrument'
 import 'dotenv/config'
 import express, { Request, Response } from 'express'
 import * as Sentry from '@sentry/node'
 
-// Initialize Sentry for Node
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  tracesSampleRate: 1.0,
-})
 
 const app = express()
+
+// Sentry.setupExpressErrorHandler(app);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -46,11 +44,43 @@ app.use((req, res, next) => {
 
 // In-memory product catalog
 const PRODUCTS = [
-  { id: 'npe', priceMinor: 1299 },
-  { id: 'typeerror', priceMinor: 999 },
-  { id: 'segfault', priceMinor: 1999 },
-  { id: 'syntax', priceMinor: 599 },
-  { id: 'oom', priceMinor: 2499 },
+  {
+    id: 'npe',
+    name: 'NullPointerException',
+    description: 'Classic dereference gone wrong. Perfect for legacy Java stacks.',
+    priceMinor: 1299,
+    badge: 'Bestseller',
+    color: 'from-purple-600 to-pink-600',
+  },
+  {
+    id: 'typeerror',
+    name: 'TypeError: undefined is not a function',
+    description: 'Bring back 2014 vibes in your JS app.',
+    priceMinor: 999,
+    color: 'from-blue-600 to-cyan-600',
+  },
+  {
+    id: 'segfault',
+    name: 'Segmentation Fault',
+    description: 'A low-level thrill for your C/C++ adventures.',
+    priceMinor: 1999,
+    badge: 'Premium',
+    color: 'from-red-600 to-orange-600',
+  },
+  {
+    id: 'syntax',
+    name: 'SyntaxError: Unexpected token',
+    description: 'Small typo, big adventure. Great for onboarding.',
+    priceMinor: 599,
+    color: 'from-green-600 to-emerald-600',
+  },
+  {
+    id: 'oom',
+    name: 'OutOfMemoryError',
+    description: 'Stress-test your autoscaling like a pro.',
+    priceMinor: 2499,
+    color: 'from-indigo-600 to-purple-600',
+  },
 ]
 
 // In-memory orders store
@@ -183,11 +213,6 @@ app.post('/api/checkout', async (req: Request, res: Response) => {
           },
           async (paymentSpan) => {
             const result = await fakeCharge(totalMinor, requestedProvider)
-            const cfg = getProviderConfig(requestedProvider)
-            paymentSpan.setAttribute('payment.latency_ms', result.latencyMs)
-            paymentSpan.setAttribute('payment.config.min_ms', cfg.minMs)
-            paymentSpan.setAttribute('payment.config.max_ms', cfg.maxMs)
-            paymentSpan.setAttribute('payment.config.failure_rate', cfg.failureRate)
             paymentSpan.setAttribute('payment.status', result.status)
             return result
           }
@@ -221,6 +246,10 @@ app.post('/api/checkout', async (req: Request, res: Response) => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+app.get('/api/products', (_req: Request, res: Response) => {
+  res.json(PRODUCTS)
 })
 
 app.get('/api/payment-config', (_req: Request, res: Response) => {
