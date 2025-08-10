@@ -57,6 +57,7 @@ npm run install:backend
 - Create `frontend/.env` with:
 ```
 VITE_SENTRY_DSN=<your public DSN>
+VITE_API_URL=http://localhost:5174
 ```
 - Create `backend/.env` with (example values shown; all are optional since defaults exist):
 ```
@@ -102,7 +103,7 @@ npm run dev:frontend
 # -> http://localhost:5173
 ```
 
-The frontend dev server proxies `/api` to the backend.
+The frontend connects directly to the backend API.
 
 ### Build for production
 ```bash

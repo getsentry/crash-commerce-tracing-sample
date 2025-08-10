@@ -9,6 +9,19 @@ Sentry.init({
 })
 
 const app = express()
+
+// Enable CORS for frontend
+app.use((req, res, next) => {
+  const origin = req.headers.origin || 'http://localhost:5173'
+  res.header('Access-Control-Allow-Origin', origin)
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.header('Access-Control-Allow-Headers', 'Content-Type, sentry-trace, baggage')
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200)
+  }
+  next()
+})
+
 app.use(express.json())
 
 // In-memory product catalog

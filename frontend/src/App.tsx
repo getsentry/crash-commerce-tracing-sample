@@ -39,6 +39,8 @@ const PAYMENT_PROVIDERS = ['ZapPay', 'GlitchPay', 'LagPay'] as const
 type PaymentProvider = (typeof PAYMENT_PROVIDERS)[number]
 type ProviderConfig = { minMs: number; maxMs: number; failureRate: number }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5174'
+
 const PRODUCTS: Product[] = [
   {
     id: 'npe',
@@ -483,7 +485,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/payment-config')
+    fetch(`${API_URL}/api/payment-config`)
       .then((r) => r.json())
       .then((cfg) => setProviderConfig(cfg))
       .catch(() => setProviderConfig(null))
@@ -546,7 +548,7 @@ function App() {
       },
       async (span) => {
         try {
-          const response = await fetch('/api/checkout', {
+          const response = await fetch(`${API_URL}/api/checkout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: cart, paymentProvider }),

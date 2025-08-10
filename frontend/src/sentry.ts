@@ -8,8 +8,8 @@ Sentry.init({
   // Set the sample rate for traces to 100%
   tracesSampleRate: 1.0,
 
-  // Set the trace propagation targets to all URLs
-  tracePropagationTargets: ['http://localhost:3005'],
+  // Set the trace propagation targets to the backend API
+  tracePropagationTargets: [/localhost:\d+/],
 
   // Add the browser tracing integration
   integrations: [Sentry.browserTracingIntegration()],
