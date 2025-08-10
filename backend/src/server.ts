@@ -97,93 +97,86 @@ async function fakeCharge(
 }
 
 app.post('/api/checkout', async (req: Request, res: Response) => {
-  // Continue trace from incoming headers, and create a single manual span for the handler
-  const incoming = {
-    sentryTrace: (req.headers['sentry-trace'] as string | undefined) ?? undefined,
-    baggage: (req.headers['baggage'] as string | undefined) ?? undefined,
-  }
+  // Start a server span; distributed tracing will be handled automatically via propagation
+  await Sentry.startSpan(
+    {
+      name: 'Order Processing',
+      op: 'commerce.order.server',
+    },
+    async (span) => {
+      try {
+        const items = (req.body?.items as { productId: string; quantity: number }[]) || []
+        const requestedProviderRaw = (req.body?.paymentProvider as string | undefined) ?? undefined
+        const requestedProvider = PAYMENT_PROVIDERS.find((p) => p === requestedProviderRaw) ?? pickPaymentProvider()
 
-  await Sentry.continueTrace(incoming, async () => {
-    await Sentry.startSpan(
-      {
-        name: 'Order Processing',
-        op: 'commerce.order.server',
-      },
-      async (span) => {
-        try {
-          const items = (req.body?.items as { productId: string; quantity: number }[]) || []
-          const requestedProviderRaw = (req.body?.paymentProvider as string | undefined) ?? undefined
-          const requestedProvider = PAYMENT_PROVIDERS.find((p) => p === requestedProviderRaw) ?? pickPaymentProvider()
+        // Validate cart
+        if (!Array.isArray(items) || items.length === 0) {
+          span.setAttribute('payment.status', 'failed')
+          span.setAttribute('inventory.reserved', false)
+          res.status(400).json({ error: 'Cart is empty' })
+          return
+        }
 
-          // Validate cart
-          if (!Array.isArray(items) || items.length === 0) {
+        let totalMinor = 0
+        for (const line of items) {
+          const product = PRODUCTS.find((p) => p.id === line.productId)
+          if (!product || line.quantity <= 0) {
             span.setAttribute('payment.status', 'failed')
             span.setAttribute('inventory.reserved', false)
-            res.status(400).json({ error: 'Cart is empty' })
+            res.status(400).json({ error: 'Invalid cart item' })
             return
           }
-
-          let totalMinor = 0
-          for (const line of items) {
-            const product = PRODUCTS.find((p) => p.id === line.productId)
-            if (!product || line.quantity <= 0) {
-              span.setAttribute('payment.status', 'failed')
-              span.setAttribute('inventory.reserved', false)
-              res.status(400).json({ error: 'Invalid cart item' })
-              return
-            }
-            totalMinor += product.priceMinor * line.quantity
-          }
-
-          // Simulate reserving inventory (80% chance true)
-          const reserved = Math.random() < 0.8
-
-          // Simulate payment
-          const charge = await Sentry.startSpan(
-            {
-              name: `Charge ${requestedProvider}`,
-              op: 'commerce.payment',
-              attributes: {
-                'payment.provider': requestedProvider,
-              },
-            },
-            async (paymentSpan) => {
-              const result = await fakeCharge(totalMinor, requestedProvider)
-              const cfg = getProviderConfig(requestedProvider)
-              paymentSpan.setAttribute('payment.latency_ms', result.latencyMs)
-              paymentSpan.setAttribute('payment.config.min_ms', cfg.minMs)
-              paymentSpan.setAttribute('payment.config.max_ms', cfg.maxMs)
-              paymentSpan.setAttribute('payment.config.failure_rate', cfg.failureRate)
-              paymentSpan.setAttribute('payment.status', result.status)
-              return result
-            }
-          )
-
-          if (charge.status === 'failed' || !reserved) {
-            span.setAttribute('payment.provider', charge.provider)
-            span.setAttribute('payment.status', 'failed')
-            span.setAttribute('inventory.reserved', reserved)
-            res.status(402).json({ error: 'Payment failed' })
-            return
-          }
-
-          const orderId = randomId()
-          ORDERS.push({ id: orderId, totalMinor, items })
-
-          // Set attributes before returning
-          span.setAttribute('order.id', orderId)
-          span.setAttribute('payment.provider', charge.provider)
-          span.setAttribute('payment.status', 'success')
-          span.setAttribute('inventory.reserved', reserved)
-
-          res.json({ orderId, paymentProvider: charge.provider })
-        } catch (err) {
-          Sentry.captureException(err)
-          res.status(500).json({ error: 'Internal error' })
+          totalMinor += product.priceMinor * line.quantity
         }
+
+        // Simulate reserving inventory (80% chance true)
+        const reserved = Math.random() < 0.8
+
+        // Simulate payment
+        const charge = await Sentry.startSpan(
+          {
+            name: `Charge ${requestedProvider}`,
+            op: 'commerce.payment',
+            attributes: {
+              'payment.provider': requestedProvider,
+            },
+          },
+          async (paymentSpan) => {
+            const result = await fakeCharge(totalMinor, requestedProvider)
+            const cfg = getProviderConfig(requestedProvider)
+            paymentSpan.setAttribute('payment.latency_ms', result.latencyMs)
+            paymentSpan.setAttribute('payment.config.min_ms', cfg.minMs)
+            paymentSpan.setAttribute('payment.config.max_ms', cfg.maxMs)
+            paymentSpan.setAttribute('payment.config.failure_rate', cfg.failureRate)
+            paymentSpan.setAttribute('payment.status', result.status)
+            return result
+          }
+        )
+
+        if (charge.status === 'failed' || !reserved) {
+          span.setAttribute('payment.provider', charge.provider)
+          span.setAttribute('payment.status', 'failed')
+          span.setAttribute('inventory.reserved', reserved)
+          res.status(402).json({ error: 'Payment failed' })
+          return
+        }
+
+        const orderId = randomId()
+        ORDERS.push({ id: orderId, totalMinor, items })
+
+        // Set attributes before returning
+        span.setAttribute('order.id', orderId)
+        span.setAttribute('payment.provider', charge.provider)
+        span.setAttribute('payment.status', 'success')
+        span.setAttribute('inventory.reserved', reserved)
+
+        res.json({ orderId, paymentProvider: charge.provider })
+      } catch (err) {
+        Sentry.captureException(err)
+        res.status(500).json({ error: 'Internal error' })
       }
-    )
-  })
+    }
+  )
 })
 
 app.get('/api/health', (_req, res) => {

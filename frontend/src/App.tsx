@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Package,
   Truck,
-  CreditCard
+  CreditCard,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -460,11 +462,12 @@ function App() {
   const [cart, setCart] = useState<CartLine[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
   const [isScrolled, setIsScrolled] = useState(false)
   const [addedToCart, setAddedToCart] = useState<string | null>(null)
   const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('ZapPay')
   const [providerConfig, setProviderConfig] = useState<Record<PaymentProvider, ProviderConfig> | null>(null)
+  const [orderConfirmation, setOrderConfirmation] = useState<{ orderId: string; provider: string; total: number } | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   const cartCount = useMemo(
     () => cart.reduce((sum, line) => sum + line.quantity, 0),
@@ -522,8 +525,8 @@ function App() {
   }
 
   async function onCheckoutClick() {
-    setMessage(null)
     setIsCheckingOut(true)
+    setCheckoutError(null)
 
     const cartValueMinor = cart.reduce((sum, line) => {
       const product = PRODUCTS.find((p) => p.id === line.productId)!
@@ -549,17 +552,27 @@ function App() {
             body: JSON.stringify({ items: cart, paymentProvider }),
           })
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`)
+            const errorData = await response.json().catch(() => ({ error: 'Payment failed' }))
+            throw new Error(errorData.error || `HTTP ${response.status}`)
           }
           const data: { orderId: string; paymentProvider: string } = await response.json()
           span.setAttribute('order.id', data.orderId)
           span.setAttribute('payment.provider', data.paymentProvider)
           Sentry.logger.info(Sentry.logger.fmt`✨ Order ${data.orderId} confirmed via ${data.paymentProvider}`)
+          
+          // Show order confirmation
+          setOrderConfirmation({
+            orderId: data.orderId,
+            provider: data.paymentProvider,
+            total: cartValueMinor
+          })
           setCart([])
           setIsCartOpen(false)
         } catch (err) {
           span.setStatus({ code: 2, message: 'internal_error' })
-          Sentry.logger.error('❌ Checkout failed. Please try again.')
+          const errorMessage = err instanceof Error ? err.message : 'Checkout failed'
+          setCheckoutError(errorMessage)
+          Sentry.logger.error(`❌ ${errorMessage}`)
           Sentry.captureException(err)
         } finally {
           setIsCheckingOut(false)
@@ -642,19 +655,85 @@ function App() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Message Banner */}
+      {/* Error Toast */}
       <AnimatePresence>
-        {message && (
+        {checkoutError && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-7xl mx-auto px-4 py-4"
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md"
           >
-            <div className="rounded-xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 backdrop-blur-sm p-4">
-              <p className="text-white text-center">{message}</p>
+            <div className="flex items-center gap-3 rounded-xl bg-red-500/20 border border-red-500/30 backdrop-blur-sm px-6 py-4">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <p className="text-white">{checkoutError}</p>
+              <button 
+                onClick={() => setCheckoutError(null)}
+                className="ml-auto text-white/60 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Order Confirmation Modal */}
+      <AnimatePresence>
+        {orderConfirmation && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOrderConfirmation(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md"
+            >
+              <div className="bg-slate-900 border border-white/10 rounded-2xl p-8 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="inline-flex p-3 rounded-full bg-green-500/20 text-green-400 mb-4"
+                >
+                  <CheckCircle className="w-12 h-12" />
+                </motion.div>
+                
+                <h2 className="text-2xl font-bold text-white mb-2">Order Confirmed!</h2>
+                <p className="text-white/60 mb-6">Your bugs are on their way</p>
+                
+                <div className="space-y-3 text-left bg-white/5 rounded-xl p-4 mb-6">
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Order ID</span>
+                    <span className="text-white font-mono">#{orderConfirmation.orderId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Payment Provider</span>
+                    <span className="text-white">{orderConfirmation.provider}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Total</span>
+                    <span className="text-white font-bold">{formatMoney(orderConfirmation.total)}</span>
+                  </div>
+                </div>
+                
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setOrderConfirmation(null)}
+                  className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+                >
+                  Continue Shopping
+                </motion.button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 

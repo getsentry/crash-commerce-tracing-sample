@@ -10,6 +10,8 @@ A end-to-end sample showing Sentry tracing and span metrics across a checkout fl
 - Product list page with animated cards and "Add to Cart"
 - Cart page with item count, total price, and Checkout button
 - Checkout calls `POST /api/checkout` with simulated latency and 10–20% failures
+- Order confirmation modal shows order ID, provider, and total on success
+- Error toast notifications display specific failure messages
 - In-memory order creation and selectable fake payment providers
 - Three fictional payment providers with configurable performance via `backend/.env`:
   - ZapPay — fast, low failure (demo: low latency, 5% failure)
@@ -115,7 +117,7 @@ npm run build:backend
 ## Where to find instrumentation
 - Frontend span creation: `frontend/src/App.tsx` inside `onCheckoutClick()`
 - Frontend Sentry init: `frontend/src/sentry.ts`
-- Backend spans: `backend/src/server.ts` in the `/api/checkout` handler using `continueTrace` + `startSpan`, plus a child span for payment
+ - Backend spans: `backend/src/server.ts` in the `/api/checkout` handler using `startSpan` (distributed tracing is propagated automatically), plus a child span for payment
 
 ### Provider performance configuration endpoint
 - `GET /api/payment-config` returns the effective per-provider configuration derived from environment variables. The UI fetches this on load and displays each provider’s latency range and failure rate next to the selector in the cart.
