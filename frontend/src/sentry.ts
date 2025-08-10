@@ -9,11 +9,12 @@ Sentry.init({
   tracesSampleRate: 1.0,
 
   // Set the trace propagation targets to the backend API
-  tracePropagationTargets: [/localhost:\d+/],
+  tracePropagationTargets: ['http://localhost:3005/api'],
 
   // Add the browser tracing integration
   integrations: [Sentry.browserTracingIntegration()],
 
   // Add the logger integration
-  enableLogs: true
+  enableLogs: true,
+  debug: true,
 })

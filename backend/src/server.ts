@@ -10,6 +10,18 @@ Sentry.init({
 
 const app = express()
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log('\n--- Incoming Request ---')
+  console.log(`${req.method} ${req.url}`)
+  console.log('Headers:', JSON.stringify(req.headers, null, 2))
+  if (req.method === 'POST' && req.body) {
+    console.log('Body:', JSON.stringify(req.body, null, 2))
+  }
+  console.log('------------------------\n')
+  next()
+})
+
 // Enable CORS for frontend
 app.use((req, res, next) => {
   const origin = req.headers.origin || 'http://localhost:5173'
@@ -23,6 +35,14 @@ app.use((req, res, next) => {
 })
 
 app.use(express.json())
+
+// Log body after JSON parsing
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.body && Object.keys(req.body).length > 0) {
+    console.log('Parsed Body:', JSON.stringify(req.body, null, 2))
+  }
+  next()
+})
 
 // In-memory product catalog
 const PRODUCTS = [
@@ -110,6 +130,13 @@ async function fakeCharge(
 }
 
 app.post('/api/checkout', async (req: Request, res: Response) => {
+  // Log Sentry trace headers if present
+  if (req.headers['sentry-trace'] || req.headers['baggage']) {
+    console.log('🔍 Sentry Trace Headers:')
+    console.log('  sentry-trace:', req.headers['sentry-trace'])
+    console.log('  baggage:', req.headers['baggage'])
+  }
+
   // Start a server span; distributed tracing will be handled automatically via propagation
   await Sentry.startSpan(
     {
