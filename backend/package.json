@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "ts-node-dev --env-file=.env --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node --env-file=.env dist/server.js"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +14,6 @@
   "type": "commonjs",
   "dependencies": {
     "@sentry/node": "^10.3.0",
-    "dotenv": "^17.2.1",
     "express": "^5.1.0"
   },
   "devDependencies": {

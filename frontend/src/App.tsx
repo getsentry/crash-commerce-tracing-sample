@@ -551,8 +551,7 @@ function App() {
           span.setStatus({ code: 2, message: 'internal_error' })
           const errorMessage = err instanceof Error ? err.message : 'Checkout failed'
           setCheckoutError(errorMessage)
-          Sentry.logger.error(`❌ ${errorMessage}`)
-          Sentry.captureException(err)
+          Sentry.logger.error(Sentry.logger.fmt`❌ ${errorMessage}`)
         } finally {
           setIsCheckingOut(false)
         }

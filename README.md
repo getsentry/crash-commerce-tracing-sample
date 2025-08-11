@@ -151,7 +151,7 @@ The UI fetches products and payment config on load, displaying provider performa
 
 ### Example views and queries to try
 - **UI checkout p95 by cart size**
-  - Filter: `op:ui.action name:Checkout`
+  - Filter: `op:ui.action description:Checkout`
   - Columns: `p95(span.duration)`, `count()`
   - Group by: `cart.item_count`
 

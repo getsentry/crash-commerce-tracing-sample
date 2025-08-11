@@ -1,5 +1,4 @@
 import './instrument'
-import 'dotenv/config'
 import express, { Request, Response } from 'express'
 import * as Sentry from '@sentry/node'
 
